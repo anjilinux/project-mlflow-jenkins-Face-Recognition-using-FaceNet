@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from src.preprocessing import extract_face, get_embedding
+from preprocessing import extract_face, get_embedding
 
 def generate_embeddings(data_dir):
     X, y = [], []
