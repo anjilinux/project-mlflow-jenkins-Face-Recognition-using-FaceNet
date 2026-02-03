@@ -112,7 +112,7 @@ pipeline {
                         exit 0
                     fi
                     echo "⏱️ Attempt $i: not ready yet..."
-                    sleep 20
+                    sleep 2
                 done
 
                 echo "❌ FastAPI failed to start"
@@ -150,7 +150,7 @@ pipeline {
                         docker rm -f $CONTAINER_NAME
                         exit 0
                     fi
-                    sleep 32
+                    sleep 1
                 done
 
                 echo "❌ FastAPI failed to start"
