@@ -153,25 +153,52 @@ pipeline {
         }
 
         /* ================= DOCKER SMOKE TEST ================= */
-        stage("Docker Smoke Test") {
-            steps {
-                sh '''#!/bin/bash
-                set -e
 
-                docker rm -f face_recog_test || true
 
-                docker run -d \
-                    -p 8888:8005 \
-                    --name face_recog_test \
-                    face-recognition:latest
 
-                sleep 10
-                curl -f http://localhost:8888/health
 
-                docker rm -f face_recog_test
-                '''
-            }
-        }
+stage("Docker Smoke Test") {
+    steps {
+        sh '''#!/bin/bash
+        set -e
+
+        IMAGE_NAME="face-recognition"
+        CONTAINER_NAME="face_recog_test"
+
+        # 🧹 Cleanup old container
+        docker rm -f $CONTAINER_NAME || true
+
+        # 🎯 Random port
+        HOST_PORT=$(shuf -i 8000-8999 -n 1)
+        echo "🌐 Using port $HOST_PORT"
+
+        # 🚀 Run container
+        docker run -d \
+            -p $HOST_PORT:8005 \
+            --name $CONTAINER_NAME \
+            $IMAGE_NAME:latest
+
+        echo "⏳ Waiting for FastAPI..."
+
+        for i in {1..30}; do
+            if curl -s http://localhost:$HOST_PORT/health | grep -q ok; then
+                echo "✅ Docker FastAPI is healthy"
+                break
+            fi
+            sleep 1
+        done
+
+        # 🔥 Final check
+        curl -f http://localhost:$HOST_PORT/health
+
+        # 🧹 Cleanup
+        docker rm -f $CONTAINER_NAME
+        '''
+    }
+}
+
+
+
 
         /* ================= ARCHIVE ================= */
         stage("Archive Artifacts") {
