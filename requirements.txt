@@ -1,0 +1,11 @@
+tensorflow
+keras-facenet
+opencv-python
+numpy
+pandas
+scikit-learn
+mlflow
+fastapi
+uvicorn
+pytest
+joblib
