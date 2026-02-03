@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 import pytest
-from src.preprocessing import extract_face, get_embedding
+from preprocessing import extract_face, get_embedding
 
 # ---------- Fixtures ----------
 
