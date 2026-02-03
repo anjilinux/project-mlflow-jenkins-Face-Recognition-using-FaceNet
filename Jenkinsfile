@@ -14,7 +14,7 @@ pipeline {
         APP_PORT = "8005"
 
         // CI-safe MLflow (no external dependency)
-        MLFLOW_TRACKING_URI = "file:${WORKSPACE}/mlruns"
+        MLFLOW_TRACKING_URI = "http://localhost:5555"
         MLFLOW_EXPERIMENT_NAME = "Face-Recognition-FaceNet"
 
         IMAGE_NAME = "face-recognition"
@@ -152,12 +152,12 @@ pipeline {
                     docker rm -f face_recognition_test || true
 
                     docker run -d \
-                        -p 9000:${APP_PORT} \
+                        -p 8888:${APP_PORT} \
                         --name face_recognition_test \
                         ${IMAGE_NAME}:latest
 
                     sleep 10
-                    curl -f http://localhost:9000/health
+                    curl -f http://localhost:8888/health
                     docker rm -f face_recognition_test
                 """
             }
