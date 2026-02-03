@@ -46,4 +46,4 @@ async def predict(file: UploadFile):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    return {"identity
+    return {"identity": pred}
