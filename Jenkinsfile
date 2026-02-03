@@ -20,15 +20,19 @@ pipeline {
         IMAGE_NAME = "face-recognition"
         IMAGE_TAG = "${BUILD_NUMBER}"
     }
+    stages{
 
-stage("Checkout Code") {
-    steps {
-        git(
-            branch: 'master',
-            url: 'https://github.com/anjilinux/project-mlflow-jenkins-Face-Recognition-using-FaceNet.git'
-        )
-    }
-}
+
+
+        stage("Checkout Code") {
+            
+            steps {
+                git(
+                    branch: 'master',
+                    url: 'https://github.com/anjilinux/project-mlflow-jenkins-Face-Recognition-using-FaceNet.git'
+                )
+            }
+        }
 
         /* ================= SETUP ENV ================= */
         stage("Setup Virtual Environment") {
@@ -198,4 +202,6 @@ stage("Checkout Code") {
             sh "rm -rf ${VENV_DIR}"
         }
     }
+
+
 }
