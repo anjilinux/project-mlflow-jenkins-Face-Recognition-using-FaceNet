@@ -198,9 +198,7 @@ pipeline {
         failure {
             echo "❌ Pipeline Failed – Check Jenkins Logs"
         }
-        always {
-            sh "rm -rf ${VENV_DIR}"
-        }
+        
     }
 
 
