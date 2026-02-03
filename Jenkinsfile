@@ -108,38 +108,39 @@ pipeline {
 
         /* ================= FASTAPI LOCAL SMOKE TEST ================= */
        
-        stage("FastAPI Smoke Test (Local)") {
-            steps {
-                sh '''#!/bin/bash
-                set -e
+       stage("FastAPI Smoke Test (Local)") {
+    steps {
+        sh '''#!/bin/bash
+        set -e
 
-                . venv/bin/activate
-                export PYTHONPATH=$WORKSPACE
+        . venv/bin/activate
+        export PYTHONPATH=$WORKSPACE
 
-                echo "🚀 Starting FastAPI..."
-                uvicorn main:app \
-                    --host 0.0.0.0 \
-                    --port 8005 \
-                    > uvicorn.log 2>&1 &
+        echo "🚀 Starting FastAPI..."
+        uvicorn main:app \
+            --host 0.0.0.0 \
+            --port 8005 \
+            > uvicorn.log 2>&1 &
 
-                # Give server time to boot
-                sleep 5
+        echo "⏳ Waiting for FastAPI to become healthy..."
 
-                echo "🔍 Checking /health endpoint..."
-                if ! curl -f http://localhost:8005/health; then
-                    echo "❌ FastAPI failed"
-                    echo "📄 Uvicorn logs:"
-                    cat uvicorn.log
-                    exit 1
-                fi
-
+        for i in {1..15}; do
+            if curl -s -f http://localhost:8005/health > /dev/null; then
                 echo "✅ FastAPI healthy"
-
-                # Cleanup
                 pkill -f "uvicorn main:app" || true
-                '''
-            }
-        }
+                exit 0
+            fi
+            echo "⏱️ Attempt $i: not ready yet..."
+            sleep 2
+        done
+
+        echo "❌ FastAPI failed to start"
+        echo "📄 Uvicorn logs:"
+        cat uvicorn.log
+        exit 1
+        '''
+    }
+}
 
 
         /* ================= DOCKER BUILD ================= */
