@@ -13,19 +13,18 @@ pipeline {
         VENV_DIR = "venv"
         APP_PORT = "8005"
 
-        // CI-safe MLflow (no external dependency)
         MLFLOW_TRACKING_URI = "http://localhost:5555"
         MLFLOW_EXPERIMENT_NAME = "Face-Recognition-FaceNet"
 
         IMAGE_NAME = "face-recognition"
-        IMAGE_TAG = "${BUILD_NUMBER}"
+        IMAGE_TAG = "latest"
+        PYTHONPATH = "${WORKSPACE}"
     }
-    stages{
 
+    stages {
 
-
+        /* ================= CHECKOUT ================= */
         stage("Checkout Code") {
-            
             steps {
                 git(
                     branch: 'master',
@@ -37,167 +36,136 @@ pipeline {
         /* ================= SETUP ENV ================= */
         stage("Setup Virtual Environment") {
             steps {
-                sh """
-                    ${PYTHON} -m venv ${VENV_DIR}
-                 
-                    ${VENV_DIR}/bin/pip install -r requirements.txt
-                """
+                sh '''
+                    python3 -m venv venv
+                    venv/bin/pip install --upgrade pip
+                    venv/bin/pip install -r requirements.txt
+                '''
             }
         }
 
         /* ================= DATA VALIDATION ================= */
-/* ================= DATA VALIDATION ================= */
-stage("Data Validation") {
-    steps {
-        sh '''
-            echo "🔍 Validating dataset structure..."
-
-            # Check raw directory
-            test -d data/raw || (echo "❌ data/raw directory missing" && exit 1)
-
-            # Check at least one class folder exists
-            if [ "$(ls -A data/raw)" = "" ]; then
-                echo "❌ No class folders found in data/raw"
-                exit 1
-            fi
-
-            # Check JPG images inside class folders
-            if ! ls data/raw/*/*.jpg >/dev/null 2>&1; then
-                echo "❌ No JPG images found inside class folders"
-                exit 1
-            fi
-
-            echo "✅ Data validation passed"
-        '''
-    }
-}
-
-
-        /* ================= FEATURE ENGINEERING ================= */
-        stage("Feature Engineering") {
+        stage("Data Validation") {
             steps {
-                sh """
-                    ${VENV_DIR}/bin/python feature_engineering.py
-                """
-            }
-        }
+                sh '''
+                    echo "🔍 Validating dataset structure..."
 
-        /* ================= PREPROCESSING ================= */
-        stage("Data Preprocessing") {
-            steps {
-                sh """
-                    ${VENV_DIR}/bin/python preprocessing.py
-                """
+                    test -d data/raw || (echo "❌ data/raw missing" && exit 1)
+
+                    if [ "$(ls -A data/raw)" = "" ]; then
+                        echo "❌ No class folders in data/raw"
+                        exit 1
+                    fi
+
+                    if ! ls data/raw/*/*.jpg >/dev/null 2>&1; then
+                        echo "❌ No JPG images found"
+                        exit 1
+                    fi
+
+                    echo "✅ Data validation passed"
+                '''
             }
         }
 
         /* ================= MODEL TRAINING ================= */
         stage("Model Training (MLflow)") {
             steps {
-                sh """
-                    export MLFLOW_TRACKING_URI=${MLFLOW_TRACKING_URI}
-                    export MLFLOW_EXPERIMENT_NAME=${MLFLOW_EXPERIMENT_NAME}
-                    ${VENV_DIR}/bin/python train.py
-                """
+                sh '''
+                    export MLFLOW_TRACKING_URI=$MLFLOW_TRACKING_URI
+                    export MLFLOW_EXPERIMENT_NAME=$MLFLOW_EXPERIMENT_NAME
+                    venv/bin/python train.py
+                '''
             }
         }
 
         /* ================= MODEL EVALUATION ================= */
         stage("Model Evaluation") {
             steps {
-                sh """
-                    ${VENV_DIR}/bin/python evaluate.py
-                """
+                sh '''
+                    venv/bin/python evaluate.py
+                '''
             }
         }
 
         /* ================= UNIT TESTS ================= */
         stage("Run PyTests") {
             steps {
-                sh """
-                    export PYTHONPATH=${WORKSPACE}
-                    ${VENV_DIR}/bin/pytest test_preprocessing.py --disable-warnings
-                    ${VENV_DIR}/bin/pytest  test_model.py --disable-warnings
-                """
+                sh '''
+                    venv/bin/pytest test_preprocessing.py --disable-warnings
+                    venv/bin/pytest test_model.py --disable-warnings
+                '''
             }
         }
 
         /* ================= MODEL CHECK ================= */
         stage("Model Artifact Check") {
             steps {
-                sh """
+                sh '''
                     test -f models/classifier.pkl || (echo "❌ Model not found" && exit 1)
-                """
+                '''
             }
         }
 
         /* ================= FASTAPI LOCAL SMOKE TEST ================= */
         stage("FastAPI Smoke Test (Local)") {
             steps {
-                sh """#!/bin/bash
-                    set -e
+                sh '''#!/bin/bash
+                set -e
 
-                    export PYTHONPATH=${WORKSPACE}
-                    ${VENV_DIR}/bin/uvicorn main:app \
-                        --host 0.0.0.0 \
-                        --port ${APP_PORT} \
-                        > uvicorn.log 2>&1 &
+                . venv/bin/activate
+                export PYTHONPATH=$WORKSPACE
 
-                    sleep 8
+                echo "🚀 Starting FastAPI..."
+                nohup uvicorn main:app \
+                    --host 0.0.0.0 \
+                    --port 8005 \
+                    > uvicorn.log 2>&1 &
 
-                    curl -f http://localhost:${APP_PORT}/health
-                    pkill -f uvicorn
-                """
+                sleep 8
+
+                if ! curl -f http://localhost:8005/health; then
+                    echo "❌ FastAPI failed"
+                    cat uvicorn.log
+                    exit 1
+                fi
+
+                echo "✅ FastAPI healthy"
+                pkill -f uvicorn || true
+                '''
             }
         }
 
         /* ================= DOCKER BUILD ================= */
         stage("Docker Build") {
             steps {
-                sh """
-                    docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
-                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest
-                """
+                sh '''
+                    docker build -t face-recognition:latest .
+                '''
             }
         }
 
         /* ================= DOCKER SMOKE TEST ================= */
         stage("Docker Smoke Test") {
             steps {
-                sh """#!/bin/bash
-                    set -e
+                sh '''#!/bin/bash
+                set -e
 
-                    docker rm -f face_recognition_test || true
+                docker rm -f face_recog_test || true
 
-                    docker run -d \
-                        -p 8888:${APP_PORT} \
-                        --name face_recognition_test \
-                        ${IMAGE_NAME}:latest
+                docker run -d \
+                    -p 8888:8005 \
+                    --name face_recog_test \
+                    face-recognition:latest
 
-                    sleep 10
-                    curl -f http://localhost:8888/health
-                    docker rm -f face_recognition_test
-                """
+                sleep 10
+                curl -f http://localhost:8888/health
+
+                docker rm -f face_recog_test
+                '''
             }
         }
 
-        /* ================= DEPLOY (MAIN ONLY) ================= */
-        stage("Deploy (Main Branch)") {
-            when {
-                branch "main"
-            }
-            steps {
-                sh """
-                    docker rm -f face-recognition || true
-                    docker run -d \
-                        -p ${APP_PORT}:${APP_PORT} \
-                        --name face-recognition \
-                        ${IMAGE_NAME}:latest
-                """
-            }
-        }
-
-        /* ================= ARCHIVE ARTIFACTS ================= */
+        /* ================= ARCHIVE ================= */
         stage("Archive Artifacts") {
             steps {
                 archiveArtifacts artifacts: '''
@@ -216,8 +184,5 @@ stage("Data Validation") {
         failure {
             echo "❌ Pipeline Failed – Check Jenkins Logs"
         }
-        
     }
-
-
 }
