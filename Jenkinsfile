@@ -46,14 +46,32 @@ pipeline {
         }
 
         /* ================= DATA VALIDATION ================= */
-        stage("Data Validation") {
-            steps {
-                sh """
-                    test -d data/raw || (echo "❌ data/raw missing" && exit 1)
-                    ls data/raw/*.jpg > /dev/null
-                """
-            }
-        }
+/* ================= DATA VALIDATION ================= */
+stage("Data Validation") {
+    steps {
+        sh '''
+            echo "🔍 Validating dataset structure..."
+
+            # Check raw directory
+            test -d data/raw || (echo "❌ data/raw directory missing" && exit 1)
+
+            # Check at least one class folder exists
+            if [ "$(ls -A data/raw)" = "" ]; then
+                echo "❌ No class folders found in data/raw"
+                exit 1
+            fi
+
+            # Check JPG images inside class folders
+            if ! ls data/raw/*/*.jpg >/dev/null 2>&1; then
+                echo "❌ No JPG images found inside class folders"
+                exit 1
+            fi
+
+            echo "✅ Data validation passed"
+        '''
+    }
+}
+
 
         /* ================= FEATURE ENGINEERING ================= */
         stage("Feature Engineering") {
