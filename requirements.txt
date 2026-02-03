@@ -9,3 +9,10 @@ fastapi
 uvicorn
 pytest
 joblib
+fastapi
+uvicorn
+python-multipart
+opencv-python
+numpy
+joblib
+tensorflow
