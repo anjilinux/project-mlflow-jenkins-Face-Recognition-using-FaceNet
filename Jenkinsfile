@@ -165,14 +165,11 @@ stage("Docker Smoke Test") {
         IMAGE_NAME="face-recognition"
         CONTAINER_NAME="face_recog_test"
 
-        # 🧹 Cleanup old container
         docker rm -f $CONTAINER_NAME || true
 
-        # 🎯 Random port
         HOST_PORT=$(shuf -i 8000-8999 -n 1)
         echo "🌐 Using port $HOST_PORT"
 
-        # 🚀 Run container
         docker run -d \
             -p $HOST_PORT:8005 \
             --name $CONTAINER_NAME \
@@ -183,19 +180,22 @@ stage("Docker Smoke Test") {
         for i in {1..30}; do
             if curl -s http://localhost:$HOST_PORT/health | grep -q ok; then
                 echo "✅ Docker FastAPI is healthy"
-                break
+                docker rm -f $CONTAINER_NAME
+                exit 0
             fi
             sleep 1
         done
 
-        # 🔥 Final check
-        curl -f http://localhost:$HOST_PORT/health
+        echo "❌ FastAPI failed to start"
+        echo "📄 Container logs:"
+        docker logs $CONTAINER_NAME
 
-        # 🧹 Cleanup
         docker rm -f $CONTAINER_NAME
+        exit 1
         '''
     }
 }
+
 
 
 
